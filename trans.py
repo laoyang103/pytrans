@@ -8,10 +8,10 @@ import json
 import time 
 import base64
 import xml.dom.minidom
+import xml.parsers.expat
 import subprocess as sp
-from io import StringIO
 from time import strftime,gmtime
-from splitstream import splitfile
+from parse import Parser
 
 gMatchMap = {}
 gKeyMapping = {}
@@ -19,14 +19,49 @@ gFltTranCode = []
 gExcludeTranCode = []
 gEndPointList = []
 gPcapList = []
+gOutPut = None
 gOutFile = None
 gOutPath = None
 gOutInterval = None
 gBPFFilter = 'host 0'
 gLastTime = 0
+gMsgCount = 1
+gXmlParser = None
+gXmlLastKey = None
 
 SOCK_ADDR, SOCK_PORT = range(2)
 SRCINFO, CONVSTR, DSTINFO = range(3)
+
+def mappingKeyVal(out, key, val):
+  global gKeyMapping
+  for k,v in gKeyMapping.items():
+    if k == key: out[v] = val
+
+def recuDict(d, out, key):
+  if isinstance(d, list):
+    for i in d: recuDict(i, out, key)
+  elif isinstance(d, dict):
+    for key, value in d.items():
+      recuDict(value, out, key)
+  else:
+    mappingKeyVal(out, key, d)
+
+def startElement(tag, attributes):
+  global gOutPut, gXmlLastKey
+  if isinstance(attributes, list):
+    for attr in attributes: mappingKeyVal(gOutPut, attr[0], attr[1])
+  else:
+    for key in attributes.keys(): mappingKeyVal(gOutPut, key, attributes[key])
+  gXmlLastKey = tag
+
+def elementContent(content):
+  global gOutPut, gXmlLastKey
+  mappingKeyVal(gOutPut, gXmlLastKey, content)
+  pass
+
+gXmlParser = xml.parsers.expat.ParserCreate()
+gXmlParser.StartElementHandler = startElement
+gXmlParser.CharacterDataHandler = elementContent
 
 def getPcapList(pcapDir):
   fileList = os.listdir(pcapDir)
@@ -88,16 +123,6 @@ def parseHttpHead(httpMsg, out):
     extension[keyVal[0]] = keyVal[1].strip()
   out['extension'] = extension
 
-def recuDict(d, out, key):
-  if isinstance(d, list):
-    for i in d: recuDict(i, out, key)
-  elif isinstance(d, dict):
-    for key, value in d.items():
-      recuDict(value, out, key)
-  else:
-    for k,v in gKeyMapping.items():
-      if k == key: out[v] = d
-
 def processMsg(msg):
   baseEnd   = msg.find(': ')
   msgBody   = msg[baseEnd+2:]
@@ -121,10 +146,10 @@ def processMsg(msg):
   timeStr =  strftime("%Y-%m-%d %H:%M:%S.", time.localtime(float(timeField))) + timeSplit[1]
   output = {'srcIp': srcIp, 'dstIp': dstIp, 'srcPort': srcPort, 'dstPort': dstPort, 'channelId': '', 'timestamp': timeStr, 'matchId': realMatchId}
 
-  parse http header
+  # parse http header
   httpKey = msgBody[:4]
   if 'POST' in httpKey or 'GET' in httpKey or 'HTTP' in httpKey:
-    out['commProtocol'] = 'HTTP'
+    output['commProtocol'] = 'HTTP'
     parseHttpHead(msgBody, output)
 
   # parse json body
@@ -140,9 +165,24 @@ def processMsg(msg):
     recuDict(originDict, output, None)
     output['msgData'] = base64.b64encode(originStr)
 
+  # parse xml body
+  global gOutPut
+  xmlStart = msgBody.find('<?xml')
+  if -1 != xmlStart:
+    gOutPut = output 
+    originStr = msgBody[xmlStart:].strip()
+    originStr = originStr[originStr.find('>')+1:]
+    gXmlParser.Parse(originStr)
+    output['msgData'] = base64.b64encode(originStr)
+
   # write reslut to file
   gOutFile.write(json.dumps(output))
   gOutFile.write('\n')
+
+  # print msg count
+  global gMsgCount
+  print('write msg %d' % (gMsgCount))
+  gMsgCount += 1
 
 def fileTimeOut(now, timeLine):
   global gOutFile, gLastTime
@@ -153,7 +193,6 @@ def fileTimeOut(now, timeLine):
   gOutFile = open(filepath, 'w')
 
 def getTcpStream(fname):
-  msgCount = 0
   lineList = []
   global gLastTime, gOutInterval
   allArgs = ['ipmstream', '-r', fname, '-s', '-B', '-T', '####%T#%A_%a#%B_%b', gBPFFilter]
@@ -162,8 +201,6 @@ def getTcpStream(fname):
   while line:
     now = time.time()
     if '####' in line:
-      msgCount += 1
-      print('write msg %d' % (msgCount))
       line = line[4:]
       if now - gLastTime >= gOutInterval: fileTimeOut(now, line)
       if 0 != len(lineList): processMsg(''.join(lineList))
