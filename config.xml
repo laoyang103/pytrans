@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+  <filter>
+    <end-point>
+      <address>118.187.52.138</address>
+      <port>54321</port>
+    </end-point>
+    <end-point>
+      <address>118.187.52.138</address>
+      <port>12345</port>
+    </end-point>
+    <transcode>/test/auth</transcode>
+    <transcode>/test/auth-B</transcode>
+    <transcode>/test/home</transcode>
+    <transcode>/test/sm</transcode>
+    <transcode>/test/home-B</transcode>
+   <transcode>/test/sm-B</transcode>
+   <transcode>123456</transcode>
+  </filter>
+  <file>
+    <interval>10</interval>
+    <store-path>/home/ubuntu/qujing/</store-path>
+  </file>
+  <mapping name="flowId">flowNo</mapping>
+  <mapping name="resCode">errCode</mapping>
+  <mapping name="channelId">channelId</mapping>
+</root>
