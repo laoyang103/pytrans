@@ -23,7 +23,7 @@
   </filter>
   <file>
     <interval>10</interval>
-    <store-path>/home/ubuntu/qujing/</store-path>
+    <store-path>/tmp</store-path>
   </file>
   <mapping name="flowId">flowNo</mapping>
   <mapping name="resCode">errCode</mapping>

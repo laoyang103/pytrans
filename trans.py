@@ -11,7 +11,6 @@ import xml.dom.minidom
 import xml.parsers.expat
 import subprocess as sp
 from time import strftime,gmtime
-from parse import Parser
 
 gMatchMap = {}
 gKeyMapping = {}
