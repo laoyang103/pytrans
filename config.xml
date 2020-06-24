@@ -29,4 +29,5 @@
   <mapping name="resCode">errCode</mapping>
   <mapping name="resCode">logEntry</mapping>
   <mapping name="channelId">channelId</mapping>
+  <mapping name="channelId">id</mapping>
 </root>
