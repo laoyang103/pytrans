@@ -10,6 +10,7 @@ import base64
 import xml.dom.minidom
 import xml.parsers.expat
 import subprocess as sp
+from yajl import *
 from time import strftime,gmtime
 
 gMatchMap = {}
@@ -36,14 +37,24 @@ def mappingKeyVal(out, key, val):
   for k,v in gKeyMapping.items():
     if k == key: out[v] = val
 
-def recuDict(d, out, key):
-  if isinstance(d, list):
-    for i in d: recuDict(i, out, key)
-  elif isinstance(d, dict):
-    for key, value in d.items():
-      recuDict(value, out, key)
-  else:
-    mappingKeyVal(out, key, d)
+class JsonHandler(YajlContentHandler):
+  def __init__(self):
+    self.outdict = None
+    self.lastKey = None
+
+  def setOutput(self, outdict): self.outdict = outdict
+  def processField(self, val): mappingKeyVal(self.outdict, self.lastKey, val)
+
+  def yajl_null(self, ctx): self.processField(None)
+  def yajl_boolean(self, ctx, boolVal): self.processField(boolVal)
+  def yajl_number(self, ctx, stringNum): self.processField(stringNum)
+  def yajl_string(self, ctx, stringVal): self.processField(stringVal)
+  def yajl_map_key(self, ctx, stringVal): self.lastKey = stringVal
+
+  def yajl_start_map(self, ctx): pass
+  def yajl_end_map(self, ctx): pass
+  def yajl_start_array(self, ctx): pass
+  def yajl_end_array(self, ctx): pass
 
 def startElement(tag, attributes):
   global gOutPut, gXmlLastKey
@@ -57,6 +68,9 @@ def elementContent(content):
   global gOutPut, gXmlLastKey
   mappingKeyVal(gOutPut, gXmlLastKey, content)
   pass
+
+gJsonHandle = JsonHandler()
+gJsonParser = YajlParser(gJsonHandle)
 
 gXmlParser = xml.parsers.expat.ParserCreate()
 gXmlParser.StartElementHandler = startElement
@@ -79,8 +93,8 @@ def readConf(confFile):
   outPath = root.getElementsByTagName('store-path')
   outInterval = root.getElementsByTagName('interval')
 
-  global gBPFFilter
   for endPoint in endPointList:
+    global gBPFFilter
     addr = endPoint.getElementsByTagName('address')[0].firstChild.data
     port = endPoint.getElementsByTagName('port')[0].firstChild.data
     gEndPointList.append({'address': addr, 'port': port})
@@ -159,15 +173,17 @@ def processMsg(msg):
   if -1 == dictStart and -1 != listStart: jsonStart = listStart
   if -1 != dictStart and -1 != listStart: jsonStart = dictStart if dictStart < listStart else listStart 
   if -1 != dictStart or  -1 != listStart:
+    global gJsonHandle, gJsonParser
+    gJsonHandle.setOutput(output)
     originStr = msgBody[jsonStart:].strip()
-    originDict = json.loads(originStr)
-    recuDict(originDict, output, None)
+    with open('/tmp/jsontmp', 'w') as f: f.write(originStr)
+    with open('/tmp/jsontmp', 'r') as f: gJsonParser.parse(f)
     output['msgData'] = base64.b64encode(originStr)
 
   # parse xml body
-  global gOutPut
   xmlStart = msgBody.find('<?xml')
   if -1 != xmlStart:
+    global gOutPut
     gOutPut = output 
     originStr = msgBody[xmlStart:].strip()
     originStr = originStr[originStr.find('>')+1:]
