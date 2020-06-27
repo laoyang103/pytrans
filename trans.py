@@ -29,6 +29,8 @@ gMsgCount = 1
 gXmlParser = None
 gXmlLastKey = None
 
+reload(sys)
+sys.setdefaultencoding('utf8')
 SOCK_ADDR, SOCK_PORT = range(2)
 SRCINFO, CONVSTR, DSTINFO = range(3)
 
@@ -191,7 +193,7 @@ def processMsg(msg):
     output['msgData'] = base64.b64encode(originStr)
 
   # write reslut to file
-  gOutFile.write(json.dumps(output))
+  gOutFile.write(json.dumps(output, ensure_ascii=False))
   gOutFile.write('\n')
 
   # print msg count
