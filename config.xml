@@ -25,6 +25,7 @@
     <interval>10</interval>
     <store-path>.</store-path>
   </file>
+  <mapping name="zhongwen">text1</mapping>
   <mapping name="flowId">flowNo</mapping>
   <mapping name="resCode">errCode</mapping>
   <mapping name="resCode">logEntry</mapping>
