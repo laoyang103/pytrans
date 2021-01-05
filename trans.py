@@ -7,6 +7,7 @@ import sys
 import json
 import time 
 import base64
+import getopt
 import xml.dom.minidom
 import xml.parsers.expat
 import subprocess as sp
@@ -28,6 +29,7 @@ gLastTime = 0
 gMsgCount = 1
 gXmlParser = None
 gXmlLastKey = None
+gXmlFeatures = '<?xml'
 
 reload(sys)
 sys.setdefaultencoding('utf8')
@@ -139,6 +141,7 @@ def parseHttpHead(httpMsg, out):
   out['extension'] = extension
 
 def processMsg(msg):
+  global gXmlFeatures
   baseEnd   = msg.find(': ')
   msgBody   = msg[baseEnd+2:]
   baseField = msg[:baseEnd].split('#')
@@ -183,7 +186,7 @@ def processMsg(msg):
     output['msgData'] = base64.b64encode(originStr)
 
   # parse xml body
-  xmlStart = msgBody.find('<?xml')
+  xmlStart = msgBody.find(gXmlFeatures)
   if -1 != xmlStart:
     global gOutPut
     gOutPut = output 
@@ -228,8 +231,15 @@ def getTcpStream(fname):
   p.stdout.close()
   p.stdin.close()
 
-getPcapList(sys.argv[1])
-readConf(sys.argv[2])
+opts,args = getopt.getopt(sys.argv[1:],'-p:-c:-e:-x:')
+print(opts)
+for optName,optValue in opts:
+  if optName in ('-p'):
+    getPcapList(optValue)
+  if optName in ('-c'):
+    readConf(optValue)
+  if optName in ('-x'):
+    gXmlFeatures = optValue
 
 for pcapFile in gPcapList:
   print('========================= Process file: %s ========================' % (pcapFile))
